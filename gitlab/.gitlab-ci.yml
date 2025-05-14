@@ -1,0 +1,80 @@
+image: hashicorp/terraform:1.5.7
+
+variables:
+  TF_ROOT: ${CI_PROJECT_DIR}/terraform
+  TF_ADDRESS: ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/terraform/state/api
+
+cache:
+  paths:
+    - ${TF_ROOT}/.terraform
+    - api/venv/
+
+before_script:
+  - cd ${TF_ROOT}
+  - terraform --version
+  - terraform init -backend-config=backend.tfvars
+
+stages:
+  - package
+  - validate
+  - plan
+  - apply
+
+package:
+  stage: package
+  script:
+    - cd ${CI_PROJECT_DIR}/api
+    - python3 -m venv venv
+    - source venv/bin/activate
+    - pip install -r requirements.txt
+    - zip -r ../terraform/lambda_function.zip .
+    - cd ${TF_ROOT}
+  artifacts:
+    paths:
+      - ${TF_ROOT}/lambda_function.zip
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+validate:
+  stage: validate
+  script:
+    - terraform validate
+  dependencies:
+    - package
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+plan:
+  stage: plan
+  script:
+    - |
+      cat > secrets-input.tfvars << EOF
+      aws_access_key = "${AWS_ACCESS_KEY_ID}"
+      aws_secret_key = "${AWS_SECRET_ACCESS_KEY}"
+      token_validation_endpoint = "${TOKEN_VALIDATION_ENDPOINT}"
+      EOF
+    - terraform plan -var-file="secrets-input.tfvars" -var-file="input.tfvars" -out=plan.tfplan
+  artifacts:
+    paths:
+      - ${TF_ROOT}/plan.tfplan
+  dependencies:
+    - package
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+apply:
+  stage: apply
+  script:
+    - |
+      cat > secrets-input.tfvars << EOF
+      aws_access_key = "${AWS_ACCESS_KEY_ID}"
+      aws_secret_key = "${AWS_SECRET_ACCESS_KEY}"
+      token_validation_endpoint = "${TOKEN_VALIDATION_ENDPOINT}"
+      EOF
+    - terraform apply -auto-approve plan.tfplan
+  dependencies:
+    - plan
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  environment:
+    name: production 
