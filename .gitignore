@@ -29,8 +29,5 @@ terraform.rc
 # Ignore lock files
 .terraform.lock.hcl 
 
-deployment-package
 devops_test.txt
-.terraform
-
-lambda_function.zip
+test.py
