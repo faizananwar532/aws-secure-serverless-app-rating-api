@@ -13,7 +13,7 @@ variable "aws_secret_key" {
 variable "aws_region" {
   description = "AWS region to deploy resources"
   type        = string
-  default = "us-east-2"
+  default = "us-east-1"
 }
 
 variable "domain_name" {
@@ -37,4 +37,8 @@ variable "route53zoneid" {
   sensitive = true
   description = "Route53 zone ID"
   type = string
+}
+variable "auth_url" {
+  description = "external auth url"
+  sensitive = true
 }

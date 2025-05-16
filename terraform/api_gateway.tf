@@ -26,7 +26,7 @@ resource "aws_apigatewayv2_stage" "default" {
 resource "aws_apigatewayv2_domain_name" "custom" {
   domain_name = "api.cloudsredevops.com"
   domain_name_configuration {
-    certificate_arn = "arn:aws:acm:us-east-2:992382560483:certificate/978929ac-fb2e-4726-8a66-8055ecf70e9d"
+    certificate_arn = "arn:aws:acm:us-east-1:992382560483:certificate/6edc2b01-2517-4c56-8610-25f1e909dec3"
     endpoint_type   = "REGIONAL"
     security_policy = "TLS_1_2"
   }
@@ -37,15 +37,6 @@ resource "aws_apigatewayv2_api_mapping" "custom" {
   domain_name = aws_apigatewayv2_domain_name.custom.domain_name
   stage       = aws_apigatewayv2_stage.default.name
 } 
-
-resource "aws_route53_record" "api_cname" {
-  name    = aws_apigatewayv2_domain_name.custom.domain_name
-  type    = "CNAME"
-  zone_id = var.route53zoneid
-  ttl     = 300
-  records = [aws_apigatewayv2_domain_name.custom.domain_name_configuration[0].target_domain_name]
-  
-}
 
 resource "aws_lambda_permission" "apigw_invoke" {
   statement_id  = "AllowExecutionFromAPIGateway"
