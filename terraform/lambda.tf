@@ -1,17 +1,3 @@
-resource "aws_iam_role" "lambda_exec" {
-  name = "${var.lambda_name}-lambda-exec-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [{
-      Action = "sts:AssumeRole",
-      Effect = "Allow",
-      Principal = {
-        Service = "lambda.amazonaws.com"
-      }
-    }]
-  })
-}
-
 resource "aws_lambda_function" "app_ratings" {
   filename         = "lambda_function.zip"
   function_name    = "${var.lambda_name}-lambda"
@@ -29,3 +15,4 @@ resource "aws_lambda_function" "app_ratings" {
   #   }
   # }
 } 
+

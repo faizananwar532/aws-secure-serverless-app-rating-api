@@ -2,7 +2,7 @@
 
 # Create AWS Secrets Manager secret
 resource "aws_secretsmanager_secret" "cloud_re_devops" {
-  name        = "cloud-sre-devops-secrets"
+  name        = "cloud-sre-devops-secrets-v1"
   description = "Secrets for Cloud Re DevOps API"
 }
 

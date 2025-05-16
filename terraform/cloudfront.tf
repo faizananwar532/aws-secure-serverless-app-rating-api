@@ -43,10 +43,10 @@ resource "aws_cloudfront_distribution" "api_distribution" {
   viewer_certificate {
     acm_certificate_arn            = "arn:aws:acm:us-east-1:992382560483:certificate/6edc2b01-2517-4c56-8610-25f1e909dec3"
     ssl_support_method             = "sni-only"
-    minimum_protocol_version       = "TLSv1.2_2021"
+    minimum_protocol_version       = "TLSv1.2_2019"
   }
 
-  web_acl_id = aws_wafv2_web_acl.cloudfront_acl.arn
+  # web_acl_id = aws_wafv2_web_acl.cloudfront_acl.arn
 }
 
 resource "aws_route53_record" "cloudfront" {
