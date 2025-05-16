@@ -1,0 +1,64 @@
+stages:
+  - prepare
+  - terraform
+
+variables:
+  TF_IN_AUTOMATION: "true"
+  AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+  AWS_DEFAULT_REGION: "us-east-2"  # Changed to match backend config
+  TF_BACKEND_BUCKET: "terraform-state-cloudsredevops"
+  TF_BACKEND_KEY: "terraform.tfstate"
+  TF_BACKEND_REGION: "us-east-2"
+  TF_BACKEND_ENCRYPT: "true"
+  TF_VAR_route53zoneid: $ROUTE53_ZONE_ID
+  TF_VAR_auth_url: $AUTH_URL
+
+prepare:
+  stage: prepare
+  script:
+    - echo "Creating API zip archive..."
+    - cd api
+    - zip -r api.zip .
+    - mv api.zip ../terraform/
+    - cd ../terraform
+    - ls -la
+  artifacts:
+    paths:
+      - terraform/api.zip
+    expire_in: 1 day
+
+terraform_init:
+  stage: terraform
+  dependencies:
+    - prepare
+  script:
+    - cd terraform
+    - echo "bucket = \"${TF_BACKEND_BUCKET}\"" > backend.tfvars
+    - echo "key = \"${TF_BACKEND_KEY}\"" >> backend.tfvars
+    - echo "region = \"${TF_BACKEND_REGION}\"" >> backend.tfvars
+    - echo "encrypt = ${TF_BACKEND_ENCRYPT}" >> backend.tfvars
+    - terraform init -reconfigure -backend-config="backend.tfvars"
+  artifacts:
+    paths:
+      - terraform/terraform.tfstate
+      - terraform/terraform.tfstate.backup
+
+terraform_plan:
+  stage: terraform
+  dependencies:
+    - terraform_init
+  script:
+    - cd terraform
+    - terraform plan -var-file="secrets-input.tfvars"
+
+terraform_apply:
+  stage: terraform
+  dependencies:
+    - terraform_plan
+  script:
+    - cd terraform
+    - terraform apply -auto-approve -var-file="secrets-input.tfvars"
+  only:
+    - main  # Only run on main branch
+  when: manual  # This job needs to be manually triggered

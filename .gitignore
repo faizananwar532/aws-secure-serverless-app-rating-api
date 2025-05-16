@@ -28,6 +28,4 @@ terraform.rc
 
 # Ignore lock files
 .terraform.lock.hcl 
-
 devops_test.txt
-test.py
