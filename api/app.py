@@ -5,6 +5,7 @@ import logging
 import time
 from datetime import datetime
 from botocore.exceptions import ClientError
+import requests
 
 # Configure logger
 logger = logging.getLogger()
@@ -19,11 +20,103 @@ if not logger.handlers:
 
 # Initialize DynamoDB client
 dynamodb = boto3.resource('dynamodb')
+# Initialize Secrets Manager client
+secrets_manager = boto3.client('secretsmanager')
+
+def get_secrets():
+    """Retrieve secrets from AWS Secrets Manager"""
+    try:
+        # Get the name of the secret from environment variable
+        secret_name = os.environ.get('AUTH_URL_SECRET_NAME', 'cloud-re-devops-secrets')
+        if not secret_name:
+            logger.warning("AUTH_URL_SECRET_NAME environment variable not set. Using default secret name")
+            secret_name = 'cloud-re-devops-secrets'
+
+        # Get the secret value
+        response = secrets_manager.get_secret_value(SecretId=secret_name)
+        secret = json.loads(response['SecretString'])
+        
+        logger.debug(f"Retrieved secrets from Secrets Manager: {secret}")
+        return secret
+    except Exception as e:
+        logger.error(f"Error retrieving secrets from Secrets Manager: {e}")
+        # Fallback to environment variables
+        return {
+            'AUTH_URL': os.environ.get('AUTH_URL'),
+            'DYNAMODB_TABLE': os.environ.get('DYNAMODB_TABLE')
+        }
+        
+        # Get the secret value
+        response = secrets_manager.get_secret_value(SecretId=secret_name)
+        secret = json.loads(response['SecretString'])
+        
+        logger.debug(f"Retrieved secrets from Secrets Manager: {secret}")
+        return secret
+    except Exception as e:
+        logger.error(f"Error retrieving secrets from Secrets Manager: {e}")
+        # Fallback to environment variables
+        return {
+            'AUTH_URL': os.environ.get('AUTH_URL'),
+            'DYNAMODB_TABLE': os.environ.get('DYNAMODB_TABLE')
+        }
+
+def get_auth_url():
+    """Retrieve authentication URL from secrets"""
+    return get_secrets().get('AUTH_URL')
+
+def validate_token(token, auth_url):
+    """Validate the access token against the auth endpoint"""
+    try:
+        logger.debug(f"Validating token against auth URL: {auth_url}")
+        
+        # Make request to auth endpoint
+        headers = {'Authorization': f'Bearer {token}'}
+        response = requests.get(auth_url, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            logger.info("Token validation successful")
+            return True
+        else:
+            logger.warning(f"Token validation failed: {response.status_code} - {response.text}")
+            return False
+    except Exception as e:
+        logger.error(f"Error validating token: {e}")
+        return False
 
 def lambda_handler(event, context):
     logger.debug(f"Received event: {json.dumps(event)}")
     
     try:
+        # Get secrets from Secrets Manager
+        secrets = get_secrets()
+        DYNAMODB_TABLE = secrets.get('DYNAMODB_TABLE')
+        
+        # Check for authentication token
+        auth_header = None
+        if 'headers' in event:
+            # Extract Authorization header (case-insensitive)
+            headers = {k.lower(): v for k, v in event['headers'].items()}
+            auth_header = headers.get('authorization')
+        
+        if not auth_header:
+            logger.error("Authorization header missing")
+            return response(401, {'message': 'Authorization header is required'})
+        
+        # Extract token from Authorization header
+        token_parts = auth_header.split(' ')
+        if len(token_parts) != 2 or token_parts[0].lower() != 'bearer':
+            logger.error("Invalid Authorization header format")
+            return response(401, {'message': 'Authorization header must be in format: Bearer <token>'})
+        
+        token = token_parts[1]
+        
+        # Get auth URL from Secrets Manager
+        auth_url = get_auth_url()
+        
+        # Validate token
+        if not validate_token(token, auth_url):
+            return response(401, {'message': 'Invalid or expired token'})
+        
         # Parse input from the request body
         if 'body' in event:
             try:
@@ -60,6 +153,8 @@ def lambda_handler(event, context):
         
         # Get table name from environment variable or use default
         table_name = os.environ.get('DYNAMODB_TABLE', 'AppRatings')
+        # Get table name from secrets
+        table_name = secrets.get('DYNAMODB_TABLE')
         table = dynamodb.Table(table_name)
         
         # Create timestamp for sorting
@@ -99,4 +194,4 @@ def response(status_code, body):
             'Access-Control-Allow-Methods': 'POST,OPTIONS'
         },
         'body': json.dumps(body)
-    } 
+    }
