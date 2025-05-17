@@ -27,10 +27,10 @@ def get_secrets():
     """Retrieve secrets from AWS Secrets Manager"""
     try:
         # Get the name of the secret from environment variable
-        secret_name = os.environ.get('AUTH_URL_SECRET_NAME', 'cloud-re-devops-secrets')
+        secret_name = os.environ.get('API_SECRET_NAME', 'cloud-sre-devops-secrets-v1')
         if not secret_name:
-            logger.warning("AUTH_URL_SECRET_NAME environment variable not set. Using default secret name")
-            secret_name = 'cloud-re-devops-secrets'
+            logger.warning("API_SECRET_NAME environment variable not set. Using default secret name")
+            secret_name = 'cloud-sre-devops-secrets-v1'
 
         # Get the secret value
         response = secrets_manager.get_secret_value(SecretId=secret_name)
@@ -46,19 +46,6 @@ def get_secrets():
             'DYNAMODB_TABLE': os.environ.get('DYNAMODB_TABLE')
         }
         
-        # Get the secret value
-        response = secrets_manager.get_secret_value(SecretId=secret_name)
-        secret = json.loads(response['SecretString'])
-        
-        logger.debug(f"Retrieved secrets from Secrets Manager: {secret}")
-        return secret
-    except Exception as e:
-        logger.error(f"Error retrieving secrets from Secrets Manager: {e}")
-        # Fallback to environment variables
-        return {
-            'AUTH_URL': os.environ.get('AUTH_URL'),
-            'DYNAMODB_TABLE': os.environ.get('DYNAMODB_TABLE')
-        }
 
 def get_auth_url():
     """Retrieve authentication URL from secrets"""
@@ -151,8 +138,6 @@ def lambda_handler(event, context):
             logger.error("Description must be less than 2000 characters")
             return response(400, {'message': 'Description must be less than 2000 characters'})
         
-        # Get table name from environment variable or use default
-        table_name = os.environ.get('DYNAMODB_TABLE', 'AppRatings')
         # Get table name from secrets
         table_name = secrets.get('DYNAMODB_TABLE')
         table = dynamodb.Table(table_name)
