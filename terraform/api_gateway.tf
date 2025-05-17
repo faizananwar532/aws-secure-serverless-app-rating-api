@@ -23,20 +23,6 @@ resource "aws_apigatewayv2_stage" "default" {
   auto_deploy = true
 }
 
-resource "aws_apigatewayv2_domain_name" "custom" {
-  domain_name = "api.cloudsredevops.com"
-  domain_name_configuration {
-    certificate_arn = "arn:aws:acm:us-east-1:992382560483:certificate/6edc2b01-2517-4c56-8610-25f1e909dec3"
-    endpoint_type   = "REGIONAL"
-    security_policy = "TLS_1_2"
-  }
-}
-
-resource "aws_apigatewayv2_api_mapping" "custom" {
-  api_id      = aws_apigatewayv2_api.http_api.id
-  domain_name = aws_apigatewayv2_domain_name.custom.domain_name
-  stage       = aws_apigatewayv2_stage.default.name
-} 
 
 resource "aws_lambda_permission" "apigw_invoke" {
   statement_id  = "AllowExecutionFromAPIGateway"

@@ -1,14 +1,13 @@
 resource "aws_cloudfront_distribution" "api_distribution" {
   enabled             = true
   is_ipv6_enabled     = true
-  comment             = "CloudFront for API Gateway custom domain"
-  default_root_object = ""
+  comment             = "CloudFront distribution for API Gateway"
 
   origin {
-    domain_name = aws_apigatewayv2_domain_name.custom.domain_name
+    domain_name = replace(aws_apigatewayv2_api.http_api.api_endpoint, "https://", "")
     origin_id   = "api-gateway-origin"
     custom_origin_config {
-      http_port              = 80
+      http_port              = 443
       https_port             = 443
       origin_protocol_policy = "https-only"
       origin_ssl_protocols   = ["TLSv1.2"]
@@ -43,10 +42,12 @@ resource "aws_cloudfront_distribution" "api_distribution" {
   viewer_certificate {
     acm_certificate_arn            = "arn:aws:acm:us-east-1:992382560483:certificate/6edc2b01-2517-4c56-8610-25f1e909dec3"
     ssl_support_method             = "sni-only"
-    minimum_protocol_version       = "TLSv1.2_2019"
+    minimum_protocol_version       = "TLSv1.2_2021"
   }
 
-  # web_acl_id = aws_wafv2_web_acl.cloudfront_acl.arn
+  web_acl_id = aws_wafv2_web_acl.cloudfront_acl.arn
+
+  aliases = ["api.cloudsredevops.com"]
 }
 
 resource "aws_route53_record" "cloudfront" {
