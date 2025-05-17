@@ -43,9 +43,46 @@ curl -X POST \
 ```
 
 ## Security
-- **CORS**: Only allows requests from allowed subdomains of `cloudsredevops.com`.
-- **WAF**: Protects against malicious requests, rate limits, and restricts referer headers.
-- **Authentication**: Uses AWS Cognito JWT tokens.
+
+1. **Secrets Management**
+   - Uses AWS Secrets Manager for sensitive data
+   - Lambda function fetches secrets at runtime
+   - Environment variables populated from secrets:
+     - `AUTH_URL`: External mock authentication URL
+     - `DB_TABLE_NAME`: DynamoDB table name
+     - `LOG_LEVEL`: Application log level
+
+2. **WAF Rules**
+   - **Domain Restriction**:
+     - Only allows requests to `api.cloudsredevops.com`
+     - Blocks requests from unauthorized domains
+   
+   - **Origin Validation**:
+     - Validates request origin
+     - Only allows subdomains of `cloudsredevops.com`
+   
+   - **AWS Managed Rules**:
+     - Common Rule Set (CRS)
+     - SQL Injection Prevention
+     - Cross-Site Scripting (XSS) Prevention
+     - Scanner and Proxy Prevention
+   
+   - **Custom Rules**:
+     - Large Payload Blocking (1MB limit)
+     - Referer Header Validation
+     - Rate Limiting
+     - IP Reputation Lists
+
+3. **Authentication**
+   - Mock authentication using external URL
+   - Accepts any valid token format
+   - No token expiration checks
+   - No role-based access control
+
+4. **Data Protection**
+   - Encrypted secrets in transit and at rest
+   - Secure logging
+   - Audit trails
 
 ## Deployment
 See `GETTING_STARTED.md` for full deployment instructions using Terraform and GitLab CI/CD.
