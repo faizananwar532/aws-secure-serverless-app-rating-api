@@ -3,6 +3,12 @@ resource "aws_cloudfront_distribution" "api_distribution" {
   is_ipv6_enabled     = true
   comment             = "CloudFront distribution for API Gateway"
 
+  logging_config {
+    bucket          = aws_s3_bucket.logs.bucket_domain_name
+    include_cookies = true
+    prefix          = "cloudfront-logs/"
+  }
+
   origin {
     domain_name = replace(aws_apigatewayv2_api.http_api.api_endpoint, "https://", "")
     origin_id   = "api-gateway-origin"
@@ -15,21 +21,15 @@ resource "aws_cloudfront_distribution" "api_distribution" {
   }
 
   default_cache_behavior {
-    allowed_methods  = ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"]
-    cached_methods   = ["GET", "HEAD", "OPTIONS"]
-    target_origin_id = "api-gateway-origin"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"]
+    cached_methods         = ["GET", "HEAD", "OPTIONS"]
+    target_origin_id       = "api-gateway-origin"
     viewer_protocol_policy = "redirect-to-https"
-    forwarded_values {
-      query_string = true
-      headers      = ["Host", "Authorization", "X-Api-Key"]
-      cookies {
-        forward = "all"
-      }
-    }
-    min_ttl     = 0
-    default_ttl = 0
-    max_ttl     = 0
+
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host_header.id
   }
+
 
   price_class = "PriceClass_100"
 
@@ -59,4 +59,60 @@ resource "aws_route53_record" "cloudfront" {
     zone_id                = aws_cloudfront_distribution.api_distribution.hosted_zone_id
     evaluate_target_health = true
   }
+}
+
+resource "aws_s3_bucket" "logs" {
+  bucket = "cloud-sre-devops-secrets-v2"
+}
+
+resource "aws_s3_bucket_ownership_controls" "logs" {
+  bucket = aws_s3_bucket.logs.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_acl" "logs" {
+  depends_on = [aws_s3_bucket_ownership_controls.logs]
+  bucket = aws_s3_bucket.logs.id
+  acl    = "log-delivery-write"
+}
+
+resource "aws_s3_bucket_versioning" "logs" {
+  bucket = aws_s3_bucket.logs.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "logs" {
+  bucket = aws_s3_bucket.logs.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "logs" {
+  bucket = aws_s3_bucket.logs.id
+  rule {
+    id     = "cleanup"
+    status = "Enabled"
+    filter {
+      prefix = "cloudfront-logs/"
+    }
+    expiration {
+      days = 90
+    }
+  }
+}
+
+
+data "aws_cloudfront_cache_policy" "caching_disabled" {
+  name = "Managed-CachingDisabled"
+}
+
+data "aws_cloudfront_origin_request_policy" "all_viewer_except_host_header" {
+  name = "Managed-AllViewerExceptHostHeader"
 }

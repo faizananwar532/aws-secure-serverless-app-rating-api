@@ -1,233 +1,233 @@
-# DevOps Test API
+# AWS Secure Serverless App Rating API
 
-## Overview
-This project implements a secure, serverless API for collecting app reviews. It uses AWS Lambda (Python), API Gateway REST API, DynamoDB, Cognito for authentication, and WAF for security. The API is accessible at `https://api.cloudsredevops.com/reviews` and only allows requests from subdomains of `cloudsredevops.com`.
+A secure, serverless application rating API built on AWS with comprehensive security measures and monitoring.
 
-## Features
-- Accepts HTTPS POST requests with parameters: `AppName` (string, max 50 chars), `Rating` (1-5), `Description` (string, max 2000 chars)
-- Authenticates requests using Cognito JWT tokens
-- Only allows requests from allowed subdomains (CORS and WAF)
-- Stores data in DynamoDB for fast retrieval by AppName and create date
-- Logs application events to CloudWatch
-- Uses AWS WAF for security (rate limiting, referer restriction, managed rules)
-- Fully serverless, highly available, and cost-efficient
+## Architecture Requirements Implementation
+The application follows a serverless architecture with the following components:
+### API Endpoint Requirements
+1. **HTTPS POST Request Handling**
+   - Implemented using API Gateway HTTP API
+   - Request validation for parameters:
+     - AppName: String, max 50 chars
+     - Rating: Number, range 1-5
+     - Description: String, max 2000 chars
+   - Input validation handled in Lambda function
 
-## API Usage
-### Endpoint
-```
-POST https://api.cloudsredevops.com/reviews
-```
+2. **Authentication**
+   - Token-based authentication using external validation endpoint
+   - Token validation endpoint configured via environment variables
+   - Lambda function validates tokens before processing requests
 
-### Request Headers
-- `Content-Type: application/json`
-- `Authorization: Bearer <JWT_TOKEN>` (from Cognito)
-- `Origin: https://api.cloudsredevops.com` (or another allowed subdomain)
+3. **Domain Access Control**
+   - Custom domain: api.cloudsredevops.com
+   - WAF rules restrict access to cloudsredevops.com subdomains
+   - CORS configuration in API Gateway
+   - Host header validation in WAF
 
-### Request Body
-```
-{
-  "AppName": "MyApp",
-  "Rating": 5,
-  "Description": "Great application!"
-}
-```
+4. **Data Storage & Retrieval**
+   - DynamoDB table with optimized schema:
+     - Partition key: AppName
+     - Sort key: CreateDate
+   - Global Secondary Index for efficient date-based queries
+   - Auto-scaling enabled for cost efficiency
 
-### Example curl Command
-```
-curl -X POST \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <JWT_TOKEN>" \
-  -H "Origin: https://api.cloudsredevops.com" \
-  -d '{"AppName": "MyApp", "Rating": 5, "Description": "Great application!"}' \
-  https://api.cloudsredevops.com/reviews
-```
+5. **Logging & Monitoring**
+   - CloudWatch Logs for application logs:
+     - Error logs
+     - Info logs
+     - Debug logs
+   - CloudFront access logs in S3
+   - API Gateway logs in CloudWatch
+   - WAF logs for security monitoring
 
-## Security
+6. **Serverless Architecture**
+   - Lambda for compute
+   - API Gateway for HTTP endpoints
+   - DynamoDB for database
+   - CloudFront for CDN
+   - No servers to manage
 
-1. **Secrets Management**
-   - Uses AWS Secrets Manager for sensitive data
-   - Lambda function fetches secrets at runtime
-   - Environment variables populated from secrets:
-     - `AUTH_URL`: External mock authentication URL
-     - `DB_TABLE_NAME`: DynamoDB table name
-     - `LOG_LEVEL`: Application log level
+7. **Security Measures**
+   - WAF rules for malicious request detection:
+     - Rate limiting
+     - SQL injection protection
+     - Suspicious user agent blocking
+     - AWS managed rules
+   - SSL/TLS encryption
+   - Secrets management
+   - IP-based access control
 
-2. **WAF Rules**
-   - **Domain Restriction**:
-     - Only allows requests to `api.cloudsredevops.com`
-     - Blocks requests from unauthorized domains
-   
-   - **Origin Validation**:
-     - Validates request origin
-     - Only allows subdomains of `cloudsredevops.com`
-   
-   - **AWS Managed Rules**:
-     - Common Rule Set (CRS)
-     - SQL Injection Prevention
-     - Cross-Site Scripting (XSS) Prevention
-     - Scanner and Proxy Prevention
-   
-   - **Custom Rules**:
-     - Large Payload Blocking (1MB limit)
-     - Referer Header Validation
-     - Rate Limiting
-     - IP Reputation Lists
+8. **High Availability**
+   - Multi-AZ deployment
+   - CloudFront global distribution
+   - DynamoDB global tables
+   - API Gateway multi-region deployment
 
-3. **Authentication**
-   - Mock authentication using external URL
-   - Accepts any valid token format
-   - No token expiration checks
-   - No role-based access control
+9. **Cost Efficiency**
+   - Pay-per-use pricing model
+   - Auto-scaling resources
+   - CloudFront caching
+   - DynamoDB on-demand capacity
 
-4. **Data Protection**
-   - Encrypted secrets in transit and at rest
-   - Secure logging
-   - Audit trails
 
-## Deployment
-See `GETTING_STARTED.md` for full deployment instructions using Terraform and GitLab CI/CD.
+## Infrastructure Setup
 
-## Architecture Overview
-
-The solution consists of:
-- AWS Lambda function (Python) for handling API requests
-- Amazon API Gateway for HTTP endpoint management
-- Amazon DynamoDB for data storage
-- AWS WAF for security
-- CloudWatch for logging and monitoring
-- Custom domain with SSL certificate
-- GitLab CI/CD pipeline for automated deployment
-
-## Features
-
-- Secure HTTPS endpoint with custom domain
-- Token-based authentication
-- Origin validation for cloudsredevops.com subdomains
-- Input validation and constraints
-- Fast data retrieval using DynamoDB indexes
-- Comprehensive logging
-- Rate limiting and security rules
-- Automated deployment pipeline
-
-## Infrastructure as Code (Terraform)
-
-The infrastructure is managed using Terraform with the following structure:
-
-```
-terraform/
-├── main.tf           # Main configuration and provider settings
-├── variables.tf      # Variable declarations
-├── api.tf           # API Gateway and Lambda configuration
-├── dynamodb.tf      # DynamoDB table configuration
-├── iam.tf           # IAM roles and policies
-├── input.tfvars # Default variable values
-└── .gitignore      # Git ignore rules
+1. Initialize Terraform with backend configuration:
+```bash
+terraform init -backend-config="backend.tfvars"
 ```
 
-### Variable Management
+2. Create a `secrets-input.tfvars` file with required variables:
+```hcl
+route53zoneid = "your-route53-zone-id"
+```
 
-The project uses a secure approach to variable management:
+3. Apply the Terraform configuration:
+```bash
+terraform apply -var-file="secrets-input.tfvars"
+```
 
-1. **Non-sensitive variables** (`input.tfvars`):
-   ```hcl
-   aws_region = "us-east-1"
-   environment = "prod"
-   domain_name = "api.cloudsredevops.com"
-   ```
+## Infrastructure Components
 
-2. **Sensitive variables** (`secrets-input.tfvars` - git-ignored):
-   ```hcl
-   aws_access_key = "YOUR_AWS_ACCESS_KEY"
-   aws_secret_key = "YOUR_AWS_SECRET_KEY"
-   token_validation_endpoint = "YOUR_TOKEN_VALIDATION_ENDPOINT"
-   ```
+### CloudFront & WAF
+- CloudFront distribution with custom domain
+- WAF rules for security
+- S3 bucket for CloudFront logs
 
-3. **Environment-specific variables**:
-   - Create separate .tfvars files for each environment (e.g., `dev.tfvars`, `prod.tfvars`)
-   - Pass sensitive variables through CI/CD
+### API Gateway
+- HTTP API with Lambda integration
+- Custom domain configuration
+- CloudWatch Logs integration
 
-### Security Features
+### Lambda Function
+- Python-based application
+- DynamoDB integration
+- Environment variables from Secrets Manager
 
-1. **WAF Protection**:
-   - Rate limiting (2000 requests per IP)
-   - Domain restriction to cloudsredevops.com subdomains
-   - AWS Managed Rules for common attack patterns
-   - SQL injection protection
-   - XSS protection
-   - Path traversal protection
+### Database
+- DynamoDB table for ratings
+- Auto-scaling configuration
 
-2. **Access Control**:
-   - IAM role-based access
-   - Token-based authentication
-   - Origin validation
-   - HTTPS encryption
-
-3. **Monitoring**:
-   - CloudWatch Logs
-   - WAF metrics
-   - API Gateway access logs
-   - Lambda function logs
-
-## Advantages
-
-1. **Cost Efficiency**:
-   - Pay-per-use pricing model with Lambda and DynamoDB
-   - No idle resources or maintenance costs
-   - Automatic scaling based on demand
-
-2. **High Availability**:
-   - Multi-AZ deployment by default
-   - No single point of failure
-   - Automatic failover
-
-3. **Security**:
-   - HTTPS encryption
-   - WAF protection against common attacks
-   - Rate limiting
-   - Origin validation
-   - Token-based authentication
-   - IAM role-based access control
-
-4. **Performance**:
-   - Fast response times with Lambda
-   - Optimized DynamoDB table design for quick queries
-   - Global secondary indexes for efficient data retrieval
-
-5. **Maintainability**:
-   - Infrastructure as Code with Terraform
-   - Automated deployment pipeline
-   - Centralized logging and monitoring
-   - Easy to update and scale
-
-## Disadvantages
-
-1. **Cold Start Latency**:
-   - Lambda functions may experience cold starts
-   - Initial request might be slower
-
-2. **Cost at Scale**:
-   - While cost-efficient for low to medium traffic
-   - Can become expensive with very high traffic
-   - DynamoDB costs increase with data size and read/write capacity
-
-3. **Vendor Lock-in**:
-   - Solution is tightly coupled with AWS services
-   - Migration to another cloud provider would require significant changes
-
-4. **Complexity**:
-   - Multiple AWS services to manage
-   - Requires understanding of various AWS services
-   - More complex than a traditional monolithic application
-
-5. **Debugging Challenges**:
-   - Distributed nature makes debugging more complex
-   - Need to check multiple services for issues
-   - Requires good logging and monitoring setup
+### Security
+- AWS Secrets Manager for sensitive data
+- WAF rules for protection
+- SSL/TLS encryption
 
 ## Monitoring
 
-- CloudWatch Logs for application logs
-- CloudWatch Metrics for API Gateway and Lambda metrics
-- WAF metrics for security monitoring
-- API Gateway access logs for request tracking
-- Lambda function logs for debugging 
+### Logs
+- CloudFront logs in S3: `s3://app-ratings-logs-{account-id}/cloudfront-logs/`
+- API Gateway logs in CloudWatch: `/aws/apigateway/app-ratings-http-api`
+
+### Metrics
+- WAF metrics in CloudWatch
+- API Gateway metrics
+- CloudFront metrics
+
+## Security Features
+
+1. **WAF Protection**:
+   - Rate limiting
+   - SQL injection protection
+   - Suspicious user agent blocking
+   - AWS managed rules
+
+2. **Access Control**:
+   - Host-based access control
+   - IP-based rate limiting
+   - User agent filtering
+
+3. **Data Protection**:
+   - SSL/TLS encryption
+   - Secrets management
+   - Secure API endpoints
+
+## Maintenance
+
+### Log Retention
+- CloudFront logs: 90 days in S3
+- API Gateway logs: 30 days in CloudWatch
+
+### Updates
+1. Update Lambda code:
+   - Modify code in `api` directory
+   - Create new zip file
+   - Update Terraform configuration
+
+2. Update WAF rules:
+   - Modify rules in `waf.tf`
+   - Apply changes with Terraform
+
+## Cleanup
+
+To destroy the infrastructure:
+```bash
+terraform destroy -var-file="secrets-input.tfvars"
+```
+
+## Advantages and Disadvantages
+
+### Advantages
+1. **Cost Efficiency**
+   - Pay-per-use model with Lambda and DynamoDB
+   - No idle resources
+   - Auto-scaling based on demand
+   - CloudFront caching reduces backend load
+
+2. **High Availability**
+   - Multi-AZ deployment
+   - No single point of failure
+   - Automatic failover
+   - Global distribution with CloudFront
+
+3. **Security**
+   - Comprehensive WAF protection
+   - SSL/TLS encryption
+   - Token-based authentication
+   - Rate limiting and DDoS protection
+
+4. **Scalability**
+   - Automatic scaling with Lambda
+   - DynamoDB auto-scaling
+   - CloudFront edge caching
+   - API Gateway throttling
+
+5. **Maintainability**
+   - Infrastructure as Code with Terraform
+   - Centralized logging
+   - Easy updates and rollbacks
+   - Automated deployment pipeline
+
+### Disadvantages
+1. **Cold Start Latency**
+   - Lambda functions may experience cold starts
+   - Initial request might be slower
+   - Can be mitigated with provisioned concurrency
+
+2. **Cost at Scale**
+   - Can become expensive with very high traffic
+   - DynamoDB costs increase with data size
+   - CloudFront data transfer costs
+
+3. **Vendor Lock-in**
+   - Solution is tightly coupled with AWS services
+   - Migration would require significant changes
+   - AWS-specific features used
+
+4. **Complexity**
+   - Multiple AWS services to manage
+   - Requires understanding of various services
+   - More complex than monolithic applications
+
+5. **Debugging Challenges**
+   - Distributed nature makes debugging complex
+   - Need to check multiple services
+   - Requires good logging setup
+
+## License
+
+[Your License Here]
+
+## Contributing
+
+[Your Contributing Guidelines Here] 

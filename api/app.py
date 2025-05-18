@@ -27,10 +27,10 @@ def get_secrets():
     """Retrieve secrets from AWS Secrets Manager"""
     try:
         # Get the name of the secret from environment variable
-        secret_name = os.environ.get('API_SECRET_NAME', 'cloud-sre-devops-secrets-v1')
+        secret_name = os.environ.get('API_SECRET_NAME', 'cloud-sre-devops-secrets-v2')
         if not secret_name:
             logger.warning("API_SECRET_NAME environment variable not set. Using default secret name")
-            secret_name = 'cloud-sre-devops-secrets-v1'
+            secret_name = 'cloud-sre-devops-secrets-v2'
 
         # Get the secret value
         response = secrets_manager.get_secret_value(SecretId=secret_name)
