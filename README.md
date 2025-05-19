@@ -15,8 +15,14 @@ The application follows a serverless architecture with the following components:
 
 2. **Authentication**
    - Token-based authentication using external validation endpoint
-   - Token validation endpoint configured via environment variables
-   - Lambda function validates tokens before processing requests
+   - Secure token validation endpoint URL stored in AWS Secrets Manager
+   - Lambda function retrieves validation endpoint URL from Secrets Manager at runtime
+   - External validation endpoint handles token verification
+   - No token validation logic in Lambda, improving security and maintainability
+   - Environment variables in Lambda configured via Secrets Manager:
+     ```hcl
+     AUTH_URL = "https://external-auth-endpoint.com/validate"
+     ```
 
 3. **Domain Access Control**
    - Custom domain: api.cloudsredevops.com
@@ -58,10 +64,20 @@ The application follows a serverless architecture with the following components:
    - IP-based access control
 
 8. **High Availability**
-   - Multi-AZ deployment
-   - CloudFront global distribution
-   - DynamoDB global tables
-   - API Gateway multi-region deployment
+   - Primary deployment in AWS us-east-1 region
+   - Global availability through CloudFront CDN:
+     - Edge locations worldwide
+     - Automatic failover
+     - Low latency access
+   - Multi-AZ deployment within us-east-1:
+     - API Gateway
+     - Lambda functions
+     - DynamoDB tables
+   - CloudFront provides:
+     - Global content delivery
+     - DDoS protection
+     - SSL/TLS termination
+     - Request caching
 
 9. **Cost Efficiency**
    - Pay-per-use pricing model
@@ -86,6 +102,55 @@ route53zoneid = "your-route53-zone-id"
 ```bash
 terraform apply -var-file="secrets-input.tfvars"
 ```
+
+## CI/CD Considerations
+
+### Secrets Manager Configuration
+To prevent unnecessary secret version updates in CI/CD:
+
+1. **Secret Version Management**:
+   ```hcl
+   resource "aws_secretsmanager_secret" "cloud_re_devops" {
+     name = "cloud-sre-devops-secrets-v2"
+     description = "Secrets for Cloud SRE DevOps API"
+   }
+
+   resource "aws_secretsmanager_secret_version" "cloud_re_devops" {
+     secret_id = aws_secretsmanager_secret.cloud_re_devops.id
+     secret_string = jsonencode({
+       AUTH_URL = var.auth_url
+       # other secrets...
+     })
+     
+     lifecycle {
+       ignore_changes = [
+         secret_string,
+         version_id,
+         version_stages
+       ]
+     }
+   }
+   ```
+
+2. **CI/CD Pipeline Configuration**:
+   - Store sensitive values as GitLab CI/CD variables
+   - Use `TF_VAR_` prefix for Terraform variables
+   - Example GitLab CI configuration:
+   ```yaml
+   variables:
+     TF_VAR_auth_url: ${AUTH_URL}
+   
+   terraform:
+     script:
+       - terraform init -backend-config="backend.tfvars"
+       - terraform apply -var-file="secrets-input.tfvars" -auto-approve
+   ```
+
+3. **Best Practices**:
+   - Use `lifecycle` block to ignore changes to sensitive values
+   - Store actual secret values in GitLab CI/CD variables
+   - Use separate secret versions for different environments
+   - Implement secret rotation policies
 
 ## Infrastructure Components
 
@@ -175,10 +240,20 @@ terraform destroy -var-file="secrets-input.tfvars"
    - CloudFront caching reduces backend load
 
 2. **High Availability**
-   - Multi-AZ deployment
-   - No single point of failure
-   - Automatic failover
-   - Global distribution with CloudFront
+   - Primary deployment in AWS us-east-1 region
+   - Global availability through CloudFront CDN:
+     - Edge locations worldwide
+     - Automatic failover
+     - Low latency access
+   - Multi-AZ deployment within us-east-1:
+     - API Gateway
+     - Lambda functions
+     - DynamoDB tables
+   - CloudFront provides:
+     - Global content delivery
+     - DDoS protection
+     - SSL/TLS termination
+     - Request caching
 
 3. **Security**
    - Comprehensive WAF protection
