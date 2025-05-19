@@ -1,308 +1,214 @@
-# AWS Secure Serverless App Rating API
+# Serverless App Rating API
 
-A secure, serverless application rating API built on AWS with comprehensive security measures and monitoring.
+A secure, serverless API for collecting and storing application ratings. Built with AWS Lambda, API Gateway, and CloudFront.
 
-## Architecture Requirements Implementation
-The application follows a serverless architecture with the following components:
-### API Endpoint Requirements
-1. **HTTPS POST Request Handling**
-   - Implemented using API Gateway HTTP API
-   - Request validation for parameters:
-     - AppName: String, max 50 chars
-     - Rating: Number, range 1-5
-     - Description: String, max 2000 chars
-   - Input validation handled in Lambda function
+## 🌟 Features
 
-2. **Authentication**
-   - Token-based authentication using external validation endpoint
-   - Secure token validation endpoint URL stored in AWS Secrets Manager
-   - Lambda function retrieves validation endpoint URL from Secrets Manager at runtime
-   - External validation endpoint handles token verification
-   - No token validation logic in Lambda, improving security and maintainability
-   - Environment variables in Lambda configured via Secrets Manager:
+- **Secure API Endpoint**: HTTPS-only access at `api.cloudsredevops.com`
+- **Rating Collection**: Accepts app ratings with name, score, and description
+- **Authentication**: Validates requests using JWT tokens
+- **Security**: Protected by AWS WAF and CloudFront
+- **Scalable**: Built on serverless architecture for high availability
+- **Cost-Efficient**: Pay only for what you use
+
+## 🏗️ Architecture
+
+```
+Client Request → CloudFront → API Gateway → Lambda → DynamoDB
+```
+
+1. **CloudFront**: 
+   - Global CDN for low latency
+   - Custom origin token for security
+   - HTTPS enforcement
+
+2. **API Gateway**:
+   - HTTP API for better performance
+   - Lambda integration for request handling
+   - Detailed access logging
+   - CloudWatch integration
+
+3. **Lambda Function**:
+   - Python 3.9 runtime
+   - Token validation
+   - Request validation and CORS handling
+   - Data processing
+   - DynamoDB interaction
+
+4. **DynamoDB**:
+   - Fast data retrieval by AppName and date
+   - Auto-scaling for large datasets
+
+## 📐 Reference Diagram
+
+The architecture follows a layered security approach with CloudFront as the entry point, providing DDoS protection and caching. The diagram shows the flow of requests through various AWS services, with each layer adding its own security and functionality. For a detailed view of the infrastructure, refer to the architecture diagram in the project documentation.
+
+## 🔒 Security Features
+
+- HTTPS-only access
+- External token-based authentication
+- CloudFront origin token validation
+- WAF protection against malicious requests
+- CORS restrictions to `cloudsredevops.com`
+- Secrets stored in AWS Secrets Manager
+
+### Authentication Flow
+1. **Token-based Authentication**:
+   - Uses external validation endpoint
+   - Validation endpoint URL stored in AWS Secrets Manager
+   - Lambda retrieves endpoint URL at runtime
+   - External service handles token verification
+   - No token validation logic in Lambda
+
+2. **Security Benefits**:
+   - Centralized token validation
+   - Improved security through external validation
+   - Better maintainability
+   - Reduced Lambda complexity
+
+## 🚀 API Usage
+
+### Endpoint
+```
+POST https://api.cloudsredevops.com
+```
+
+### Headers
+```
+Authorization: Bearer <your-jwt-token>
+Content-Type: application/json
+```
+
+### Sample Request
+```bash
+curl --location --request POST 'https://api.cloudsredevops.com' \
+--header 'Authorization: Bearer <your-jwt-token>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "AppName": "TestApp6",
+    "Rating": 4,
+    "Description": "This is a test app description"
+}'
+```
+
+Note: The CloudFront origin token is automatically handled by CloudFront when requests come from the allowed domain (`cloudsredevops.com`). You don't need to include it in your requests. And `<your-jwt-token`> should be replaced with the JWT token.
+
+### Request Body
+```json
+{
+    "AppName": "MyApp",
+    "Rating": 5,
+    "Description": "Great application!"
+}
+```
+
+### Validation Rules
+- AppName: Required, max 50 characters
+- Rating: Required, integer between 1-5 (decimal values not accepted)
+- Description: Optional, max 2000 characters
+
+## 🛠️ Infrastructure Setup
+
+### Prerequisites
+1. **AWS Resources**:
+   - AWS Account with appropriate permissions
+   - Route53 hosted zone
+   - S3 bucket for Terraform state
+   - External authentication service
+
+2. **Configuration Files**:
+   - `backend.tfvars`:
      ```hcl
-     AUTH_URL = "https://external-auth-endpoint.com/validate"
+     bucket  = "#BUCKET-NAME-HERE"
+     key     = "terraform.tfstate"
+     region  = "#BUCKET-REGION"
+     encrypt = true
+     ```
+   
+   - `secrets-input.tfvars`:
+     ```hcl
+     aws_access_key         = "your-aws-access-key"
+     aws_secret_key         = "your-aws-secret-key"
+     route53zoneid         = "your-route53-zone-id"
+     auth_url             = "your-auth-validation-endpoint"
+     cloudfront_origin_token = "your-cloudfront-token"
      ```
 
-3. **Domain Access Control**
-   - Custom domain: api.cloudsredevops.com
-   - WAF rules restrict access to cloudsredevops.com subdomains
-   - CORS configuration in API Gateway
-   - Host header validation in WAF
+### Deployment Steps
 
-4. **Data Storage & Retrieval**
-   - DynamoDB table with optimized schema:
-     - Partition key: AppName
-     - Sort key: CreateDate
-   - Global Secondary Index for efficient date-based queries
-   - Auto-scaling enabled for cost efficiency
-
-5. **Logging & Monitoring**
-   - CloudWatch Logs for application logs:
-     - Error logs
-     - Info logs
-     - Debug logs
-   - CloudFront access logs in S3
-   - API Gateway logs in CloudWatch
-   - WAF logs for security monitoring
-
-6. **Serverless Architecture**
-   - Lambda for compute
-   - API Gateway for HTTP endpoints
-   - DynamoDB for database
-   - CloudFront for CDN
-   - No servers to manage
-
-7. **Security Measures**
-   - WAF rules for malicious request detection:
-     - Rate limiting
-     - SQL injection protection
-     - Suspicious user agent blocking
-     - AWS managed rules
-   - SSL/TLS encryption
-   - Secrets management
-   - IP-based access control
-
-8. **High Availability**
-   - Primary deployment in AWS us-east-1 region
-   - Global availability through CloudFront CDN:
-     - Edge locations worldwide
-     - Automatic failover
-     - Low latency access
-   - Multi-AZ deployment within us-east-1:
-     - API Gateway
-     - Lambda functions
-     - DynamoDB tables
-   - CloudFront provides:
-     - Global content delivery
-     - DDoS protection
-     - SSL/TLS termination
-     - Request caching
-
-9. **Cost Efficiency**
-   - Pay-per-use pricing model
-   - Auto-scaling resources
-   - CloudFront caching
-   - DynamoDB on-demand capacity
-
-
-## Infrastructure Setup
-
-1. Initialize Terraform with backend configuration:
-```bash
-terraform init -backend-config="backend.tfvars"
-```
-
-2. Create a `secrets-input.tfvars` file with required variables:
-```hcl
-route53zoneid = "your-route53-zone-id"
-```
-
-3. Apply the Terraform configuration:
-```bash
-terraform apply -var-file="secrets-input.tfvars"
-```
-
-## CI/CD Considerations
-
-### Secrets Manager Configuration
-To prevent unnecessary secret version updates in CI/CD:
-
-1. **Secret Version Management**:
-   ```hcl
-   resource "aws_secretsmanager_secret" "cloud_re_devops" {
-     name = "cloud-sre-devops-secrets-v2"
-     description = "Secrets for Cloud SRE DevOps API"
-   }
-
-   resource "aws_secretsmanager_secret_version" "cloud_re_devops" {
-     secret_id = aws_secretsmanager_secret.cloud_re_devops.id
-     secret_string = jsonencode({
-       AUTH_URL = var.auth_url
-       # other secrets...
-     })
-     
-     lifecycle {
-       ignore_changes = [
-         secret_string,
-         version_id,
-         version_stages
-       ]
-     }
-   }
-   ```
-
-2. **CI/CD Pipeline Configuration**:
-   - Store sensitive values as GitLab CI/CD variables
-   - Use `TF_VAR_` prefix for Terraform variables
-   - Example GitLab CI configuration:
-   ```yaml
-   variables:
-     TF_VAR_auth_url: ${AUTH_URL}
+1. **Initialize Terraform**:
+   ```bash
+   # Initialize with backend configuration
+   terraform init -backend-config="backend.tfvars"
    
-   terraform:
-     script:
-       - terraform init -backend-config="backend.tfvars"
-       - terraform apply -var-file="secrets-input.tfvars" -auto-approve
+   # Review planned changes
+   terraform plan -var-file="secrets-input.tfvars"
    ```
 
-3. **Best Practices**:
-   - Use `lifecycle` block to ignore changes to sensitive values
-   - Store actual secret values in GitLab CI/CD variables
-   - Use separate secret versions for different environments
-   - Implement secret rotation policies
+2. **Apply Infrastructure**:
+   ```bash
+   # Apply the configuration
+   terraform apply -var-file="secrets-input.tfvars"
+   ```
 
-## Infrastructure Components
+### Infrastructure Components Created
+- CloudFront Distribution
+- API Gateway HTTP API
+- Lambda Function
+- DynamoDB Table
+- WAF Web ACL
+- S3 Bucket for Logs
+- IAM Roles and Policies
+- Secrets Manager Secret
+- Route53 Records
 
-### CloudFront & WAF
-- CloudFront distribution with custom domain
-- WAF rules for security
-- S3 bucket for CloudFront logs
+## 📊 Monitoring
 
-### API Gateway
-- HTTP API with Lambda integration
-- Custom domain configuration
-- CloudWatch Logs integration
+- CloudWatch Logs for application logs
+- CloudFront access logs in S3
+- WAF logs for security monitoring
 
-### Lambda Function
-- Python-based application
-- DynamoDB integration
-- Environment variables from Secrets Manager
+## 💰 Cost Optimization
 
-### Database
-- DynamoDB table for ratings
-- Auto-scaling configuration
+- Serverless architecture (pay per use)
+- CloudFront caching
+- DynamoDB auto-scaling
+- Log retention policies
 
-### Security
-- AWS Secrets Manager for sensitive data
-- WAF rules for protection
-- SSL/TLS encryption
+## 🔄 CI/CD Pipeline
 
-## Monitoring
+1. **Prepare Stage**
+   - Package Lambda function
+   - Install dependencies
 
-### Logs
-- CloudFront logs in S3: `s3://app-ratings-logs-{account-id}/cloudfront-logs/`
-- API Gateway logs in CloudWatch: `/aws/apigateway/app-ratings-http-api`
+2. **Terraform Stages**
+   - Initialize backend
+   - Plan changes
+   - Apply changes (manual approval)
 
-### Metrics
-- WAF metrics in CloudWatch
-- API Gateway metrics
-- CloudFront metrics
+## ⚖️ Advantages
 
-## Security Features
+- **Scalability**: Auto-scales with demand
+- **Security**: Multiple layers of protection
+- **Cost**: Pay-per-use pricing
+- **Maintenance**: No server management
+- **Performance**: Global CDN distribution
 
-1. **WAF Protection**:
-   - Rate limiting
-   - SQL injection protection
-   - Suspicious user agent blocking
-   - AWS managed rules
+## ⚠️ Considerations
 
-2. **Access Control**:
-   - Host-based access control
-   - IP-based rate limiting
-   - User agent filtering
+- **Cold Starts**: Lambda initialization delay
+- **Cost**: Can be higher for high-traffic applications
+- **Complexity**: Multiple AWS services to manage
+- **Debugging**: Distributed logging across services
 
-3. **Data Protection**:
-   - SSL/TLS encryption
-   - Secrets management
-   - Secure API endpoints
+## 🔧 Troubleshooting
 
-## Maintenance
+1. **API Not Responding**
+   - Check CloudFront distribution
+   - Verify Lambda function status
+   - Check API Gateway logs
 
-### Log Retention
-- CloudFront logs: 90 days in S3
-- API Gateway logs: 30 days in CloudWatch
-
-### Updates
-1. Update Lambda code:
-   - Modify code in `api` directory
-   - Create new zip file
-   - Update Terraform configuration
-
-2. Update WAF rules:
-   - Modify rules in `waf.tf`
-   - Apply changes with Terraform
-
-## Cleanup
-
-To destroy the infrastructure:
-```bash
-terraform destroy -var-file="secrets-input.tfvars"
-```
-
-## Advantages and Disadvantages
-
-### Advantages
-1. **Cost Efficiency**
-   - Pay-per-use model with Lambda and DynamoDB
-   - No idle resources
-   - Auto-scaling based on demand
-   - CloudFront caching reduces backend load
-
-2. **High Availability**
-   - Primary deployment in AWS us-east-1 region
-   - Global availability through CloudFront CDN:
-     - Edge locations worldwide
-     - Automatic failover
-     - Low latency access
-   - Multi-AZ deployment within us-east-1:
-     - API Gateway
-     - Lambda functions
-     - DynamoDB tables
-   - CloudFront provides:
-     - Global content delivery
-     - DDoS protection
-     - SSL/TLS termination
-     - Request caching
-
-3. **Security**
-   - Comprehensive WAF protection
-   - SSL/TLS encryption
-   - Token-based authentication
-   - Rate limiting and DDoS protection
-
-4. **Scalability**
-   - Automatic scaling with Lambda
-   - DynamoDB auto-scaling
-   - CloudFront edge caching
-   - API Gateway throttling
-
-5. **Maintainability**
-   - Infrastructure as Code with Terraform
-   - Centralized logging
-   - Easy updates and rollbacks
-   - Automated deployment pipeline
-
-### Disadvantages
-1. **Cold Start Latency**
-   - Lambda functions may experience cold starts
-   - Initial request might be slower
-   - Can be mitigated with provisioned concurrency
-
-2. **Cost at Scale**
-   - Can become expensive with very high traffic
-   - DynamoDB costs increase with data size
-   - CloudFront data transfer costs
-
-3. **Vendor Lock-in**
-   - Solution is tightly coupled with AWS services
-   - Migration would require significant changes
-   - AWS-specific features used
-
-4. **Complexity**
-   - Multiple AWS services to manage
-   - Requires understanding of various services
-   - More complex than monolithic applications
-
-5. **Debugging Challenges**
-   - Distributed nature makes debugging complex
-   - Need to check multiple services
-   - Requires good logging setup
-
-## License
-
-[Your License Here]
-
-## Contributing
-
-[Your Contributing Guidelines Here] 
+2. **Authentication Failures**
+   - Validate JWT token
+   - Check CloudFront origin token
+   - Verify CORS configuration
