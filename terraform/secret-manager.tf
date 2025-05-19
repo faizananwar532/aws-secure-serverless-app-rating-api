@@ -1,5 +1,3 @@
-
-
 # Create AWS Secrets Manager secret
 resource "aws_secretsmanager_secret" "cloud_re_devops" {
   name        = "cloud-sre-devops-secrets-v2"
@@ -9,9 +7,16 @@ resource "aws_secretsmanager_secret" "cloud_re_devops" {
 resource "aws_secretsmanager_secret_version" "cloud_re_devops" {
   secret_id = aws_secretsmanager_secret.cloud_re_devops.id
   secret_string = jsonencode({
-    AUTH_URL      = var.auth_url
-    DYNAMODB_TABLE = "cloudsredevops-ratings"
+    AUTH_URL           = var.auth_url
+    DYNAMODB_TABLE     = "cloudsredevops-ratings"
+    CLOUDFRONT_ORIGIN_TOKEN = var.cloudfront_origin_token
   })
+  
+  lifecycle {
+    ignore_changes = [
+      version_stages
+    ]
+  }
 }
 
 # Create IAM role for Lambda

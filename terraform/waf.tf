@@ -89,10 +89,41 @@ resource "aws_wafv2_web_acl" "cloudfront_acl" {
     }
   }
 
+  # Rule to block direct API Gateway access
+  rule {
+    name     = "BlockDirectAPIGatewayAccess"
+    priority = 2
+    action {
+      block {}
+    }
+    
+    statement {
+      byte_match_statement {
+        field_to_match {
+          single_header {
+            name = "host"
+          }
+        }
+        positional_constraint = "CONTAINS"
+        search_string         = "execute-api.us-east-1.amazonaws.com"
+        text_transformation {
+          priority = 0
+          type     = "NONE"
+        }
+      }
+    }
+    
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "BlockDirectAPIGatewayAccess"
+      sampled_requests_enabled   = true
+    }
+  }
+
   # Rule 2: AWS Managed Rules - Core ruleset to detect common web attacks
   rule {
     name     = "AWSManagedRulesCommonRuleSet"
-    priority = 2
+    priority = 3
     
     override_action {
       count {}  # Use count instead of block to avoid blocking legitimate traffic
@@ -115,7 +146,7 @@ resource "aws_wafv2_web_acl" "cloudfront_acl" {
   # Rule 3: SQL Injection Protection
   rule {
     name     = "AWSManagedRulesSQLiRuleSet"
-    priority = 3
+    priority = 4
     
     override_action {
       none {}  # Block SQL injection attempts
@@ -138,7 +169,7 @@ resource "aws_wafv2_web_acl" "cloudfront_acl" {
   # Rule 5: Rate-Based Rule - Block requests exceeding 1000 requests per minute
   rule {
     name     = "RateBasedRule"
-    priority = 4
+    priority = 5
     
     action {
       block {}
@@ -180,7 +211,7 @@ resource "aws_wafv2_web_acl" "cloudfront_acl" {
   # Rule 6: Block Suspicious User Agents
   rule {
     name     = "BlockSuspiciousUserAgents"
-    priority = 5
+    priority = 6
     
     action {
       block {}

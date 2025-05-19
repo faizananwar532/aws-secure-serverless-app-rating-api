@@ -33,12 +33,21 @@ variable "lambda_name" {
   type = string
   default = "cloudsredevops"
 }
+
 variable "route53zoneid" {
   sensitive = true
   description = "Route53 zone ID"
   type = string
 }
+
 variable "auth_url" {
   description = "external auth url"
   sensitive = true
+  type = string
+}
+
+variable "cloudfront_origin_token" {
+  description = "Secret token for CloudFront origin validation"
+  type        = string
+  sensitive   = true
 }
