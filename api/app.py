@@ -43,13 +43,18 @@ def get_secrets():
         # Fallback to environment variables
         return {
             'AUTH_URL': os.environ.get('AUTH_URL'),
-            'DYNAMODB_TABLE': os.environ.get('DYNAMODB_TABLE')
+            'DYNAMODB_TABLE': os.environ.get('DYNAMODB_TABLE'),
+            'CLOUDFRONT_ORIGIN_TOKEN': os.environ.get('CLOUDFRONT_ORIGIN_TOKEN')
         }
         
 
 def get_auth_url():
     """Retrieve authentication URL from secrets"""
     return get_secrets().get('AUTH_URL')
+
+def get_cloudfront_token():
+    """Retrieve CloudFront origin token from secrets"""
+    return get_secrets().get('CLOUDFRONT_ORIGIN_TOKEN')
 
 def validate_token(token, auth_url):
     """Validate the access token against the auth endpoint"""
@@ -74,6 +79,13 @@ def lambda_handler(event, context):
     logger.debug(f"Received event: {json.dumps(event)}")
     
     try:
+        # Check for CloudFront origin token
+        headers = event.get('headers', {})
+        origin_token = headers.get('x-origin-token') or headers.get('X-Origin-Token')
+        if not origin_token or origin_token != get_cloudfront_token():
+            logger.error("Invalid or missing origin token")
+            return response(403, {'message': 'Forbidden: Invalid origin'})
+
         # Get secrets from Secrets Manager
         secrets = get_secrets()
         DYNAMODB_TABLE = secrets.get('DYNAMODB_TABLE')
@@ -174,7 +186,7 @@ def response(status_code, body):
         'statusCode': status_code,
         'headers': {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*.cloudsredevops.com',
+            'Access-Control-Allow-Origin': 'https://api.cloudsredevops.com',
             'Access-Control-Allow-Headers': 'Content-Type,Authorization',
             'Access-Control-Allow-Methods': 'POST,OPTIONS'
         },
